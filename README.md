@@ -51,6 +51,14 @@ python -m http.server 8765 --directory C:\Users\Amit.Aalok\sa1-map
 
 then open `http://localhost:8765/?sa1=21203130422`.
 
+## Usage log (Google Sheet)
+
+Page views and prints can be logged to a Google Sheet you own. `analytics/Code.gs` is the Apps
+Script: create a sheet, Extensions > Apps Script, paste it, Deploy > New deployment > Web app
+(execute as me, anyone can access), then put the `/exec` URL in `LOG_URL` at the top of `app.js`.
+Each row: timestamp, event (view/print), organiser name (optional box in the sidebar, remembered
+per device), SA1 count, the SA1 codes, seat and suburb picked, page URL. PINs are never sent.
+
 ## Hosting
 
 Any static host works; there is no server code. GitHub Pages: push this folder to a public repo, then

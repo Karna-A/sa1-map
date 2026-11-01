@@ -24,6 +24,8 @@
   // Print pages use a thinner line and lighter fill so street names underneath stay readable.
   var STYLE_PRINT_TARGET = { color: '#d00', weight: 1.5, opacity: 1, fillColor: '#d00', fillOpacity: 0.05 };
   var STYLE_DISTRICT = { color: '#8c1515', weight: 3, opacity: 0.9, dashArray: '10 8', fill: false, interactive: false };
+  // Usage log: Apps Script web app URL from analytics/Code.gs (empty string = no logging).
+  var LOG_URL = '';
   var TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
   var TILE_OPTS = { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' };
 
@@ -41,7 +43,7 @@
   var printMaps = [];             // Leaflet maps created for the current print run
 
   var el = {};
-  ['codes', 'apply', 'print', 'clear', 'seat', 'suburb', 'suburb-scope', 'status', 'count', 'selected-list', 'print-pages']
+  ['codes', 'apply', 'print', 'clear', 'seat', 'suburb', 'suburb-scope', 'name', 'status', 'count', 'selected-list', 'print-pages']
     .forEach(function (id) { el[id.replace(/-(\w)/g, function (_, c) { return c.toUpperCase(); })] = document.getElementById(id); });
 
   // ---------------------------------------------------------------- data loading
@@ -269,6 +271,26 @@
     setSelected(codes.slice(), true);
   }
 
+  // ---------------------------------------------------------------- usage log
+  // One row per page view and per print. Codes only, never PINs. Fire-and-forget:
+  // no-cors because Apps Script cannot answer a CORS preflight, keepalive so the
+  // print request survives the print dialog opening.
+  function logEvent(event, codes) {
+    if (!LOG_URL) return;
+    var body = JSON.stringify({
+      event: event,
+      name: el.name.value.trim(),
+      sa1_count: codes.length,
+      sa1s: codes.join(','),
+      seat: el.seat.value,
+      suburb: el.suburb.value,
+      page: location.origin + location.pathname
+    });
+    try {
+      fetch(LOG_URL, { method: 'POST', mode: 'no-cors', keepalive: true, body: body });
+    } catch (err) { /* logging must never break the map */ }
+  }
+
   // ---------------------------------------------------------------- print: one page per SA1
   // "PIN 1234   Please login at alp.sfox.au" (the reminder prints even without a PIN).
   function fillPinLine(node, code) {
@@ -286,6 +308,7 @@
     if (!codes.length) { window.alert('Nothing to print: select at least one SA1 first.'); return; }
     if (codes.length > 60 && !window.confirm('Print ' + codes.length + ' pages (one per SA1)?')) return;
 
+    logEvent('print', codes);
     document.body.classList.add('printing');
     el.printPages.innerHTML = '';
     printMaps = [];
@@ -362,6 +385,11 @@
   });
   el.suburb.addEventListener('change', function () { if (el.suburb.value) pickSuburb(el.suburb.value); });
   el.print.addEventListener('click', doPrint);
+  // Organiser name is remembered on this device so it is typed once.
+  try { el.name.value = localStorage.getItem('sa1map.name') || ''; } catch (err) { /* storage blocked */ }
+  el.name.addEventListener('change', function () {
+    try { localStorage.setItem('sa1map.name', el.name.value.trim()); } catch (err) { /* storage blocked */ }
+  });
   map.on('moveend zoomend', loadViewport);
   map.on('tooltipopen', function (e) {
     // Leaflet creates the tooltip DOM lazily; make sure it carries the right class.
@@ -387,4 +415,5 @@
 
   var initial = readUrl();
   if (initial.length) setSelected(initial, true); else syncUi();
+  logEvent('view', initial);
 })();
