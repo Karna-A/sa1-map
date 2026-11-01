@@ -1,9 +1,11 @@
 /*
  * SA1 print map.
  *
- * State lives in the URL so a map can be shared or bookmarked:
- *   ?sa1=21203130422:1234,21203130423
+ * State lives in the URL FRAGMENT so a map can be shared or bookmarked:
+ *   #sa1=21203130422:1234,21203130423
  * (each code may carry its own SwiftFox PIN after a colon; it is printed on that SA1's page).
+ * The fragment is never sent to any server (GitHub, proxies, chat link-preview bots), which
+ * matters because of the PINs. Links from the first version used ?sa1= and still work.
  *
  * Data is pre-split per SA2 (data/sa2/<9 digits>.json); an SA1 code's first 9 digits
  * are its SA2 code, so the file for any code is known without an index. The SA2
@@ -126,12 +128,17 @@
 
   // ---------------------------------------------------------------- selection
   // Accepts "code" or "code:pin" tokens separated by commas, spaces or new lines.
-  function parseCodes(text) {
+  // fromUrl: the PIN was percent-encoded by token(), so decode it (never throw on a bad link).
+  function parseCodes(text, fromUrl) {
     var out = [];
     (text.match(/\d{11}(?::[^\s,]*)?/g) || []).forEach(function (tok) {
       var code = tok.slice(0, 11);
       if (out.indexOf(code) < 0) out.push(code);
-      if (tok.length > 12) pins[code] = decodeURIComponent(tok.slice(12));
+      if (tok.length > 12) {
+        var pin = tok.slice(12);
+        if (fromUrl) { try { pin = decodeURIComponent(pin); } catch (err) { /* keep as typed */ } }
+        pins[code] = pin;
+      }
     });
     return out;
   }
@@ -188,10 +195,10 @@
   }
 
   function syncUi() {
-    // Built by hand rather than URLSearchParams so the commas stay readable in the address bar.
-    var parts = [];
-    if (selected.length) parts.push('sa1=' + selected.map(token).join(','));
-    history.replaceState(null, '', parts.length ? '?' + parts.join('&') : location.pathname);
+    // Built by hand so the commas stay readable in the address bar. Writing the fragment
+    // also drops any legacy ?sa1= query string from an old link.
+    var state = selected.length ? '#sa1=' + selected.map(token).join(',') : '';
+    history.replaceState(null, '', location.pathname + state);
 
     if (document.activeElement !== el.codes) el.codes.value = selected.join('\n');
     el.count.textContent = selected.length ? '(' + selected.length + ')' : '';
@@ -226,7 +233,10 @@
   }
 
   function readUrl() {
-    return parseCodes(new URLSearchParams(location.search).get('sa1') || '');
+    // location.hash / location.search are raw (still percent-encoded), so a PIN containing
+    // a comma stays %2C here and cannot be mistaken for a code separator.
+    var m = /[#&]sa1=([^&]*)/.exec(location.hash) || /[?&]sa1=([^&#]*)/.exec(location.search);
+    return parseCodes(m ? m[1] : '', true);
   }
 
   // ---------------------------------------------------------------- bulk pick (seat / suburb)

@@ -5,9 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SA1 map</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="style.css?v=9">
+  <!-- Only the site origin ever leaves as a referrer; map state sits in the URL fragment,
+       which browsers never send anywhere. The CSP is defence in depth: no inline script,
+       scripts and styles only from this site, tiles only from OpenStreetMap, and the usage
+       log only to Apps Script (which answers with a redirect to googleusercontent). -->
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://*.tile.openstreetmap.org; connect-src 'self' https://script.google.com https://*.googleusercontent.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <link rel="stylesheet" href="lib/leaflet/leaflet.css">
+  <link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
   <div id="sidebar">
@@ -41,8 +46,7 @@
 
   <div id="print-pages"></div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="app.js?v=9"></script>
+  <script src="lib/leaflet/leaflet.js"></script>
+  <script src="app.js?v=10"></script>
 </body>
 </html>

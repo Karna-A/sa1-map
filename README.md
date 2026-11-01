@@ -8,10 +8,11 @@ Static site for printing doorknock maps of Victorian SA1s. Replaces the old
 Open `index.html` (hosted, or via a local server) with the SA1 codes in the URL:
 
 ```
-?sa1=21203130422:1234,21203130423
+#sa1=21203130422:1234,21203130423
 ```
 
-(`code:pin` gives that SA1 its own SwiftFox PIN, printed on its page.)
+(`code:pin` gives that SA1 its own SwiftFox PIN, printed on its page. State sits in the URL
+fragment, after `#`, which browsers never send to any server; old `?sa1=` links still work.)
 
 - Paste codes into the box (commas, spaces or new lines all work) and press Enter or **Show**.
 - Click any SA1 on the map to add it; click a selected SA1 to set its PIN. The selected list on
@@ -27,15 +28,16 @@ Open `index.html` (hosted, or via a local server) with the SA1 codes in the URL:
 
 ## Data
 
-Everything comes from the Spatial folder, nothing from the roll:
+Everything comes from the Spatial folder (set `SA1_SPATIAL_DIR` to its location), nothing from the roll:
 
-- `Spatial/sa1_districts.shp`: ABS SA1 2021 polygons for Victoria, tagged with the VEC 2022 state district.
-- `Spatial/Victoria Boundries/LOCALITY_POLYGON.shp`: Vicmap localities, overlaid on each SA1 to give the suburb
+- `sa1_districts.shp`: ABS SA1 2021 polygons for Victoria, tagged with the VEC 2022 state district.
+- `Victoria Boundries/LOCALITY_POLYGON.shp`: Vicmap localities, overlaid on each SA1 to give the suburb
   (every locality holding 20%+ of the SA1's area, largest first).
 
 Rebuild after either file changes:
 
 ```
+set SA1_SPATIAL_DIR=<folder with the shapefiles>
 python build/build_sa1_data.py
 ```
 
@@ -46,10 +48,11 @@ Outputs `data/sa2/<SA2 code>.json` (one file per SA2, simplified to about 2 m), 
 ## Local testing
 
 ```
-python -m http.server 8765 --directory C:\Users\Amit.Aalok\sa1-map
+python -m http.server 8765
 ```
 
-then open `http://localhost:8765/?sa1=21203130422`.
+from the repo folder, then open `http://localhost:8765/#sa1=21203130422`. (Usage logging only
+accepts rows from the live site, so local runs are not logged.)
 
 ## Usage log (Google Sheet)
 
@@ -58,6 +61,8 @@ Script: create a sheet, Extensions > Apps Script, paste it, Deploy > New deploym
 (execute as me, anyone can access), then put the `/exec` URL in `LOG_URL` at the top of `app.js`.
 Each row: timestamp, event (view/print), organiser name (optional box in the sidebar, remembered
 per device), SA1 count, the SA1 codes, seat and suburb picked, page URL. PINs are never sent.
+The endpoint is public, so the script only accepts rows shaped like the page's own and the log
+is advisory, not evidence. Leaflet is vendored in `lib/leaflet/` (1.9.4) so nothing loads from a CDN.
 
 ## Hosting
 

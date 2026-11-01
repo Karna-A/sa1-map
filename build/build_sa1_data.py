@@ -25,6 +25,7 @@ with " / ". SA1s with no locality overlap (shouldn't happen on land) fall back t
 SA2 name. Run time is about a minute; re-run only when the shapefiles change.
 """
 import json
+import os
 import sys
 import time
 from collections import defaultdict
@@ -37,7 +38,11 @@ from shapely.geometry import shape, mapping
 from shapely.ops import transform
 from shapely.strtree import STRtree
 
-SPATIAL = Path(r"C:\Users\Amit.Aalok\Australian Labor Party Victoria\Data - General\Amit\Spatial")
+# Folder holding the shapefiles; set SA1_SPATIAL_DIR rather than hard-coding a path here
+# (this script is in a public repo).
+SPATIAL = Path(os.environ.get("SA1_SPATIAL_DIR") or "/nonexistent").expanduser()
+if not (SPATIAL / "sa1_districts.shp").is_file():
+    sys.exit("Set SA1_SPATIAL_DIR to the folder containing sa1_districts.shp and Victoria Boundries/")
 SA1_SHP = SPATIAL / "sa1_districts.shp"
 LOC_SHP = SPATIAL / "Victoria Boundries" / "LOCALITY_POLYGON.shp"
 DIST_SHP = SPATIAL / "Victoria Boundries" / "STATE_ASSEMBLY_2022.shp"
