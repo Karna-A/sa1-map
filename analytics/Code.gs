@@ -49,15 +49,21 @@ function append_(b) {
     range.setNumberFormats([['yyyy-mm-dd hh:mm:ss', '@', '@', '0', '@', '@', '@', '@']]);
     range.setValues([[
       new Date(),
-      String(b.event || '').slice(0, 20),
-      String(b.name || '').slice(0, 80),
+      text_(b.event, 20),
+      text_(b.name, 80),
       Number(b.sa1_count) || 0,
-      String(b.sa1s || '').slice(0, 5000),   // space-separated 11-digit codes; a whole seat fits
-      String(b.seat || '').slice(0, 60),
-      String(b.suburb || '').slice(0, 60),
-      String(b.page || '').slice(0, 200)
+      text_(b.sa1s, 5000),   // space-separated 11-digit codes; a whole seat fits
+      text_(b.seat, 60),
+      text_(b.suburb, 60),
+      text_(b.page, 200)
     ]]);
   } finally {
     lock.releaseLock();
   }
+}
+
+// A value starting with = + - or @ would be stored as a formula even in a text-formatted
+// cell (setValues parses formulas), so strip those characters off the front.
+function text_(v, max) {
+  return String(v || '').replace(/^[=+\-@]+/, '').slice(0, max);
 }
