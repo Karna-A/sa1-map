@@ -1,33 +1,35 @@
-/* Screen layout: toolbar on top, map fills the rest. */
+/* Screen layout: controls in a left sidebar, map fills the rest. */
 html, body { height: 100%; margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #222; }
-body { display: flex; flex-direction: column; background: #fff; color-scheme: light; }
+body { display: flex; flex-direction: row; background: #fff; color-scheme: light; }
 
-#toolbar { padding: 8px 12px; background: #f4f4f4; border-bottom: 1px solid #ccc; }
-#toolbar .row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
-#toolbar label { font-weight: bold; white-space: nowrap; }
-#codes { flex: 1; min-width: 240px; box-sizing: border-box; font: inherit; font-family: Consolas, monospace; resize: vertical; }
-#toolbar button, #toolbar select, #toolbar input { font: inherit; padding: 5px 10px; }
-#toolbar button { cursor: pointer; }
-#seat { min-width: 180px; }
-#suburb { min-width: 180px; }
-#login { flex: 1; min-width: 260px; }
+#sidebar { width: 340px; flex: none; box-sizing: border-box; padding: 10px 12px; background: #f4f4f4; border-right: 1px solid #ccc; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+#sidebar h1 { font-size: 18px; margin: 0 0 4px; }
+#sidebar h2 { font-size: 14px; margin: 10px 0 2px; }
+#sidebar label { font-weight: bold; margin-top: 4px; }
+#sidebar .muted { font-weight: normal; color: #666; }
+#sidebar textarea, #sidebar select, #sidebar input, #sidebar button { font: inherit; padding: 5px 8px; box-sizing: border-box; width: 100%; }
+#codes { font-family: Consolas, monospace; resize: vertical; }
+#sidebar .buttons { display: flex; gap: 6px; }
+#sidebar button { cursor: pointer; width: auto; flex: 1; }
 #status { color: #b00020; min-height: 1em; }
 #help { color: #666; font-size: 12px; }
 
-#page { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-#header { padding: 6px 12px; border-bottom: 1px solid #ddd; display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap; }
-#header-title { font-size: 18px; font-weight: bold; }
-#header-list { list-style: none; margin: 0; padding: 0; display: flex; gap: 18px; flex-wrap: wrap; }
-#header-list li b { font-family: Consolas, monospace; }
-#header-date { color: #666; margin-left: auto; }
-#map { flex: 1; min-height: 0; }
+/* Selected SA1 list: code, suburb and a PIN box per row. */
+#selected-list .row { display: grid; grid-template-columns: 1fr 70px 24px; gap: 4px 6px; align-items: center; padding: 4px 0; border-bottom: 1px solid #ddd; }
+#selected-list .row b { font-family: Consolas, monospace; }
+#selected-list .row .place { grid-column: 1; color: #555; font-size: 12px; }
+#selected-list .row input { grid-column: 2; grid-row: 1 / span 2; padding: 3px 5px; }
+#selected-list .row button { grid-column: 3; grid-row: 1 / span 2; padding: 0; width: 24px; height: 24px; flex: none; line-height: 1; }
+#selected-list .row.missing { color: #b00020; }
+
+#map { flex: 1; min-width: 0; }
 
 /* SA1 labels. Neighbour labels only appear once zoomed in (class toggled by app.js). */
-.sa1-label { background: none; border: none; box-shadow: none; font-family: Consolas, monospace; font-size: 11px; color: #555; padding: 0; }
+.sa1-label { background: none; border: none; box-shadow: none; font-family: Consolas, monospace; font-size: 11px; color: #555; padding: 0; text-align: center; }
 .sa1-label.selected { color: #c00; font-weight: bold; font-size: 12px; }
 .sa1-label.neighbour { display: none; }
 .show-neighbour-labels .sa1-label.neighbour, .print-page .sa1-label.neighbour { display: block; }
-.district-label { background: none; border: none; box-shadow: none; font-size: 14px; font-weight: bold; color: #1a4dba; text-transform: uppercase; letter-spacing: 1px; padding: 0; display: none; }
+.district-label { background: none; border: none; box-shadow: none; font-size: 14px; font-weight: bold; color: #8c1515; text-transform: uppercase; letter-spacing: 1px; padding: 0; display: none; }
 .show-district-labels .district-label { display: block; }
 
 /* Print: one A4 landscape page per SA1, each with its own map.
@@ -37,7 +39,7 @@ body { display: flex; flex-direction: column; background: #fff; color-scheme: li
 
 #print-pages { display: none; }
 body.printing { display: block; }
-body.printing #toolbar, body.printing #page { display: none; }
+body.printing #sidebar, body.printing #map { display: none; }
 body.printing #print-pages { display: block; }
 
 .print-page { width: 277mm; height: 188mm; overflow: hidden; display: flex; flex-direction: column; box-sizing: border-box; break-after: page; page-break-after: always; }
@@ -51,6 +53,6 @@ body.printing #print-pages { display: block; }
 
 @media print {
   body { display: block; }
-  #toolbar, #page { display: none !important; }
+  #sidebar, #map { display: none !important; }
   #print-pages { display: block; }
 }

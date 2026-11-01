@@ -8,19 +8,23 @@ Static site for printing doorknock maps of Victorian SA1s. Replaces the old
 Open `index.html` (hosted, or via a local server) with the SA1 codes in the URL:
 
 ```
-?sa1=21203130422,21203130423
+?sa1=21203130422:1234,21203130423&login=jsmith
 ```
 
+(`code:pin` gives that SA1 its own PIN; `login` is printed on every page.)
+
 - Paste codes into the box (commas, spaces or new lines all work) and press Enter or **Show**.
-- Click any SA1 on the map to add or remove it. Zoom in to see the surrounding SA1s and their codes.
-  Blue dashed lines are the state district boundaries.
-- **Whole seat** / **Whole suburb** select every SA1 in that seat or suburb (a suburb includes any
-  SA1 of which it covers 20% or more).
-- **Login details** is free text (e.g. the SwiftFox username and PIN) printed on every page so a
-  volunteer can be handed the sheet and log in.
+- Click any SA1 on the map to add it; click a selected SA1 to set its PIN. The selected list on
+  the left also has a PIN box and a remove button per SA1. Zoom in to see the surrounding SA1s.
+  Dashed dark-red lines are the state district boundaries.
+- **Whole seat** selects every SA1 in a seat. **Suburb** then narrows to that seat's suburbs and
+  selects only the SA1s in both (with no seat chosen it selects the whole suburb). A suburb
+  includes any SA1 of which it covers 20% or more.
+- **Login details** is free text (e.g. the SwiftFox username) printed on every page; each SA1's
+  PIN is printed on its own page after it.
 - **Print** produces one A4 landscape page per selected SA1: the code in large type, suburb,
   district, date, login line and a map of that SA1 with its neighbours.
-- The URL always reflects the selection and login text, so copy it to reproduce the exact print.
+- The URL always reflects the selection, PINs and login text, so copy it to reproduce the print.
 
 ## Data
 
