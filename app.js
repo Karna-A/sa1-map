@@ -2,45 +2,45 @@
  * SA1 print map.
  *
  * State lives in the URL so a map can be shared or bookmarked:
- *   ?sa1=21203130422,21203130423&pin=-37.8,144.96,Meet%20here&pin=...
+ *   ?sa1=21203130422,21203130423&login=jsmith%20PIN%201234
  *
  * Data is pre-split per SA2 (data/sa2/<9 digits>.json); an SA1 code's first 9 digits
  * are its SA2 code, so the file for any code is known without an index. The SA2
  * bbox index (data/sa2_index.json) is only used to load whatever is in view so the
- * surrounding SA1s can be drawn and clicked.
+ * surrounding SA1s can be drawn and clicked. districts.json holds the state district
+ * outlines; groups.json maps each seat and suburb to its SA1 codes for bulk printing.
  */
 (function () {
   'use strict';
 
   var DATA = 'data/';
-  var NEIGHBOUR_ZOOM = 13;   // load and draw surrounding SA1s from this zoom
-  var LABEL_ZOOM = 15;       // show neighbour code labels from this zoom
+  var NEIGHBOUR_ZOOM = 13;       // load and draw surrounding SA1s from this zoom
+  var LABEL_ZOOM = 15;           // show neighbour code labels from this zoom
+  var DISTRICT_LABEL_ZOOM = 11;  // show district names from this zoom
+  var HEADER_MAX = 20;           // on-screen header lists at most this many SA1s
 
   var STYLE_SELECTED = { color: '#d00', weight: 3, opacity: 1, fillColor: '#d00', fillOpacity: 0.08 };
   var STYLE_NEIGHBOUR = { color: '#777', weight: 1, opacity: 0.8, fillColor: '#000', fillOpacity: 0 };
+  var STYLE_DISTRICT = { color: '#1a4dba', weight: 3, opacity: 0.9, dashArray: '10 8', fill: false, interactive: false };
+  var TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  var TILE_OPTS = { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' };
 
   var map = L.map('map').setView([-37.81, 144.96], 10);
-  var tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-  }).addTo(map);
+  L.tileLayer(TILE_URL, TILE_OPTS).addTo(map);
 
   var selected = [];              // SA1 codes in the order they were entered
-  var pins = [];                  // {lat, lng, label, marker}
+  var login = '';                 // free text printed on every page (SwiftFox user / PIN)
   var sa1Layers = {};             // code -> Leaflet polygon layer (once its SA2 file is loaded)
+  var sa2Data = {};               // SA2 code -> raw GeoJSON (re-drawn on the print pages)
   var sa2Loads = {};              // SA2 code -> Promise (dedupes fetches)
   var sa2Index = null;            // SA2 code -> [minlng, minlat, maxlng, maxlat]
-  var pinMode = false;
+  var districts = null;           // {lines: GeoJSON geometry, labels: [{name, lat, lng}]}
+  var groups = null;              // {seats: {name: [codes]}, suburbs: {name: [codes]}}
+  var printMaps = [];             // Leaflet maps created for the current print run
 
-  var el = {
-    codes: document.getElementById('codes'),
-    apply: document.getElementById('apply'),
-    addpin: document.getElementById('addpin'),
-    print: document.getElementById('print'),
-    status: document.getElementById('status'),
-    list: document.getElementById('header-list'),
-    date: document.getElementById('header-date')
-  };
+  var el = {};
+  ['codes', 'apply', 'print', 'seat', 'suburb', 'suburbs', 'login', 'status', 'header-list', 'header-date', 'print-pages']
+    .forEach(function (id) { el[id.replace(/-(\w)/g, function (_, c) { return c.toUpperCase(); })] = document.getElementById(id); });
 
   // ---------------------------------------------------------------- data loading
   function loadSa2(sa2) {
@@ -48,6 +48,7 @@
       sa2Loads[sa2] = fetch(DATA + 'sa2/' + sa2 + '.json')
         .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
         .then(function (geojson) {
+          sa2Data[sa2] = geojson;
           L.geoJSON(geojson, { style: styleFor, onEachFeature: onEachSa1 }).addTo(map);
         })
         .catch(function () { /* no such SA2 (code outside VIC or mistyped): handled by the missing-code check */ });
@@ -66,9 +67,14 @@
     applyLayerStyle(code);
     layer.on('click', function (e) {
       L.DomEvent.stopPropagation(e);
-      if (pinMode) { placePin(e.latlng); return; }
       toggleSelected(code);
     });
+  }
+
+  function setTooltipClass(tooltip, cls) {
+    tooltip.options.className = cls;
+    var node = tooltip.getElement();
+    if (node) node.className = 'leaflet-tooltip leaflet-zoom-animated ' + cls;
   }
 
   function applyLayerStyle(code) {
@@ -77,23 +83,22 @@
     var isSel = selected.indexOf(code) >= 0;
     layer.setStyle(isSel ? STYLE_SELECTED : STYLE_NEIGHBOUR);
     if (isSel) layer.bringToFront();
-    var tip = layer.getTooltip();
-    if (tip) {
-      var tipEl = tip.getElement();
-      // Tooltip element may not exist yet if the layer is off-screen; class is also set on open.
-      tip.options.className = 'sa1-label ' + (isSel ? 'selected' : 'neighbour');
-      if (tipEl) tipEl.className = 'leaflet-tooltip leaflet-zoom-animated ' + tip.options.className;
-    }
+    if (layer.getTooltip()) setTooltipClass(layer.getTooltip(), 'sa1-label ' + (isSel ? 'selected' : 'neighbour'));
   }
 
   // Load every SA2 whose bbox touches the viewport so neighbours can be seen and clicked.
   function loadViewport() {
-    map.getContainer().classList.toggle('show-neighbour-labels', map.getZoom() >= LABEL_ZOOM);
-    if (map.getZoom() < NEIGHBOUR_ZOOM || !sa2Index) return;
-    var b = map.getBounds();
-    Object.keys(sa2Index).forEach(function (sa2) {
+    var z = map.getZoom();
+    map.getContainer().classList.toggle('show-neighbour-labels', z >= LABEL_ZOOM);
+    map.getContainer().classList.toggle('show-district-labels', z >= DISTRICT_LABEL_ZOOM);
+    if (z < NEIGHBOUR_ZOOM || !sa2Index) return;
+    sa2sInBounds(map.getBounds()).forEach(loadSa2);
+  }
+
+  function sa2sInBounds(b) {
+    return Object.keys(sa2Index || {}).filter(function (sa2) {
       var x = sa2Index[sa2];
-      if (x[2] >= b.getWest() && x[0] <= b.getEast() && x[3] >= b.getSouth() && x[1] <= b.getNorth()) loadSa2(sa2);
+      return x[2] >= b.getWest() && x[0] <= b.getEast() && x[3] >= b.getSouth() && x[1] <= b.getNorth();
     });
   }
 
@@ -111,6 +116,7 @@
     previous.forEach(applyLayerStyle);
     var sa2s = {};
     codes.forEach(function (c) { sa2s[c.slice(0, 9)] = true; });
+    el.status.textContent = codes.length > 50 ? 'Loading ' + codes.length + ' SA1s…' : '';
     return Promise.all(Object.keys(sa2s).map(loadSa2)).then(function () {
       selected.forEach(applyLayerStyle);
       var missing = selected.filter(function (c) { return !sa1Layers[c]; });
@@ -138,96 +144,138 @@
     if (b) map.fitBounds(b, { padding: [30, 30], maxZoom: 18 });
   }
 
-  // ---------------------------------------------------------------- pins
-  function placePin(latlng) {
-    var label = window.prompt('Pin label (leave blank for none)', '');
-    setPinMode(false);
-    if (label === null) return;
-    addPin({ lat: latlng.lat, lng: latlng.lng, label: label.trim() });
-    syncUi();
-  }
-
-  function addPin(p) {
-    var marker = L.marker([p.lat, p.lng], { draggable: true }).addTo(map);
-    if (p.label) marker.bindTooltip(p.label, { permanent: true, direction: 'top', offset: [-15, -10], className: 'pin-label' });
-    marker.on('dragend', function () {
-      var ll = marker.getLatLng();
-      p.lat = ll.lat; p.lng = ll.lng;
-      syncUi();
-    });
-    marker.on('click', function (e) {
-      L.DomEvent.stopPropagation(e);
-      if (!window.confirm('Remove this pin' + (p.label ? ' (' + p.label + ')' : '') + '?')) return;
-      map.removeLayer(marker);
-      pins.splice(pins.indexOf(p), 1);
-      syncUi();
-    });
-    p.marker = marker;
-    pins.push(p);
-  }
-
-  function setPinMode(on) {
-    pinMode = on;
-    document.body.classList.toggle('pinmode', on);
-    el.addpin.classList.toggle('armed', on);
-    el.addpin.textContent = on ? 'Click the map…' : 'Add pin';
-  }
-
   // ---------------------------------------------------------------- URL, header, textarea
   function syncUi() {
     // Built by hand rather than URLSearchParams so the commas stay readable in the address bar.
     var parts = [];
     if (selected.length) parts.push('sa1=' + selected.join(','));
-    pins.forEach(function (p) {
-      parts.push('pin=' + p.lat.toFixed(6) + ',' + p.lng.toFixed(6) + (p.label ? ',' + encodeURIComponent(p.label) : ''));
-    });
+    if (login) parts.push('login=' + encodeURIComponent(login));
     history.replaceState(null, '', parts.length ? '?' + parts.join('&') : location.pathname);
 
     if (document.activeElement !== el.codes) el.codes.value = selected.join('\n');
 
-    el.list.innerHTML = '';
-    selected.forEach(function (c) {
+    el.headerList.innerHTML = '';
+    selected.slice(0, HEADER_MAX).forEach(function (c) {
       var props = sa1Layers[c] ? sa1Layers[c].feature.properties : null;
       var li = document.createElement('li');
       var b = document.createElement('b');
       b.textContent = c;
       li.appendChild(b);
       li.appendChild(document.createTextNode(props ? '  ' + props.suburb + '  (' + props.district + ')' : '  not found'));
-      el.list.appendChild(li);
+      el.headerList.appendChild(li);
     });
-    el.date.textContent = new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
+    if (selected.length > HEADER_MAX) {
+      var more = document.createElement('li');
+      more.textContent = '+' + (selected.length - HEADER_MAX) + ' more (' + selected.length + ' SA1s selected)';
+      el.headerList.appendChild(more);
+    }
+    el.headerDate.textContent = today();
+  }
+
+  function today() {
+    return new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
   }
 
   function readUrl() {
     var params = new URLSearchParams(location.search);
-    params.getAll('pin').forEach(function (s) {
-      var parts = s.split(',');
-      var lat = parseFloat(parts[0]), lng = parseFloat(parts[1]);
-      if (isFinite(lat) && isFinite(lng)) addPin({ lat: lat, lng: lng, label: parts.slice(2).join(',') });
-    });
+    login = params.get('login') || '';
+    el.login.value = login;
     return parseCodes(params.get('sa1') || '');
   }
 
-  // ---------------------------------------------------------------- print
+  // ---------------------------------------------------------------- bulk pick (seat / suburb)
+  function fillGroups() {
+    Object.keys(groups.seats).forEach(function (name) {
+      var o = document.createElement('option');
+      o.value = name;
+      o.textContent = name + ' (' + groups.seats[name].length + ')';
+      el.seat.appendChild(o);
+    });
+    Object.keys(groups.suburbs).forEach(function (name) {
+      var o = document.createElement('option');
+      o.value = name;
+      el.suburbs.appendChild(o);
+    });
+  }
+
+  function pickGroup(kind, name) {
+    var codes = groups && groups[kind][name];
+    if (!codes) { el.status.textContent = 'No ' + (kind === 'seats' ? 'seat' : 'suburb') + ' called "' + name + '"'; return; }
+    setSelected(codes.slice(), true);
+  }
+
+  // ---------------------------------------------------------------- print: one page per SA1
   function doPrint() {
+    var codes = selected.filter(function (c) { return sa1Layers[c]; });
+    if (!codes.length) { window.alert('Nothing to print: select at least one SA1 first.'); return; }
+    if (codes.length > 60 && !window.confirm('Print ' + codes.length + ' pages (one per SA1)?')) return;
+
     document.body.classList.add('printing');
-    map.invalidateSize();
-    fitSelected();
-    var done = false;
+    el.printPages.innerHTML = '';
+    printMaps = [];
+
+    var remaining = codes.length;
+    var fired = false;
+    function tileLayerDone() { remaining -= 1; if (remaining <= 0) go(); }
     function go() {
-      if (done) return;
-      done = true;
-      tiles.off('load', go);
+      if (fired) return;
+      fired = true;
       window.print();
     }
-    // Wait for the tiles of the print-sized map to arrive, but never hang on a slow tile server.
-    tiles.on('load', go);
-    setTimeout(go, 4000);
+
+    codes.forEach(function (code) {
+      var props = sa1Layers[code].feature.properties;
+      var page = document.createElement('div');
+      page.className = 'print-page';
+      page.innerHTML =
+        '<div class="pp-code"></div>' +
+        '<div class="pp-sub"><span class="pp-date"></span><span class="pp-place"></span></div>' +
+        '<div class="pp-login"></div>' +
+        '<div class="pp-map"></div>';
+      page.querySelector('.pp-code').textContent = code;
+      page.querySelector('.pp-place').textContent = props.suburb + '  ·  ' + props.district + ' District';
+      page.querySelector('.pp-date').textContent = today();
+      page.querySelector('.pp-login').textContent = login ? 'Login: ' + login : '';
+      el.printPages.appendChild(page);
+
+      var m = L.map(page.querySelector('.pp-map'), {
+        zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false,
+        boxZoom: false, keyboard: false, touchZoom: false, fadeAnimation: false, zoomAnimation: false
+      });
+      var tl = L.tileLayer(TILE_URL, TILE_OPTS).addTo(m);
+      if (districts) L.geoJSON(districts.lines, { style: STYLE_DISTRICT }).addTo(m);
+
+      // Context: the SA1s of every loaded SA2 that overlaps this SA1's surroundings.
+      var target = sa1Layers[code].getBounds().pad(0.5);
+      var context = [];
+      sa2sInBounds(target).forEach(function (sa2) {
+        if (sa2Data[sa2]) context = context.concat(sa2Data[sa2].features);
+      });
+      L.geoJSON({ type: 'FeatureCollection', features: context }, {
+        style: function (f) { return f.properties.sa1 === code ? STYLE_SELECTED : STYLE_NEIGHBOUR; },
+        onEachFeature: function (f, layer) {
+          layer.bindTooltip(f.properties.sa1, {
+            permanent: true, direction: 'center', interactive: false,
+            className: 'sa1-label ' + (f.properties.sa1 === code ? 'selected' : 'neighbour')
+          });
+        }
+      }).addTo(m);
+
+      m.fitBounds(sa1Layers[code].getBounds(), { padding: [10, 10], maxZoom: 18 });
+      tl.once('load', tileLayerDone);
+      printMaps.push(m);
+    });
+
+    // Never hang on a slow tile server: print anyway after a generous wait.
+    setTimeout(go, 6000 + 150 * codes.length);
   }
+
   window.addEventListener('afterprint', function () {
+    printMaps.forEach(function (m) { m.remove(); });
+    printMaps = [];
+    el.printPages.innerHTML = '';
     document.body.classList.remove('printing');
     map.invalidateSize();
-    fitSelected();
   });
 
   // ---------------------------------------------------------------- wiring
@@ -235,19 +283,35 @@
   el.codes.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); el.apply.click(); }
   });
-  el.addpin.addEventListener('click', function () { setPinMode(!pinMode); });
+  el.seat.addEventListener('change', function () {
+    if (el.seat.value) { el.suburb.value = ''; pickGroup('seats', el.seat.value); }
+  });
+  el.suburb.addEventListener('change', function () {
+    if (el.suburb.value) { el.seat.value = ''; pickGroup('suburbs', el.suburb.value.trim()); }
+  });
+  el.login.addEventListener('input', function () { login = el.login.value.trim(); syncUi(); });
   el.print.addEventListener('click', doPrint);
-  map.on('click', function (e) { if (pinMode) placePin(e.latlng); });
   map.on('moveend zoomend', loadViewport);
   map.on('tooltipopen', function (e) {
     // Leaflet creates the tooltip DOM lazily; make sure it carries the right class.
-    var el2 = e.tooltip.getElement();
-    if (el2 && e.tooltip.options.className.indexOf('sa1-label') === 0) el2.className = 'leaflet-tooltip leaflet-zoom-animated ' + e.tooltip.options.className;
+    if (e.tooltip.options.className) setTooltipClass(e.tooltip, e.tooltip.options.className);
   });
 
   fetch(DATA + 'sa2_index.json').then(function (r) { return r.json(); }).then(function (idx) {
     sa2Index = idx;
     loadViewport();
+  });
+  fetch(DATA + 'districts.json').then(function (r) { return r.json(); }).then(function (d) {
+    districts = d;
+    L.geoJSON(d.lines, { style: STYLE_DISTRICT }).addTo(map);
+    d.labels.forEach(function (lab) {
+      L.tooltip({ permanent: true, direction: 'center', interactive: false, className: 'district-label' })
+        .setLatLng([lab.lat, lab.lng]).setContent(lab.name).addTo(map);
+    });
+  });
+  fetch(DATA + 'groups.json').then(function (r) { return r.json(); }).then(function (g) {
+    groups = g;
+    fillGroups();
   });
 
   var initial = readUrl();

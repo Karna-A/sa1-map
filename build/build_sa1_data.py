@@ -13,6 +13,11 @@ Outputs (into ../data):
                         per-SA1 index is needed.
   sa2_index.json        {sa2_code: [minlng, minlat, maxlng, maxlat]} so the browser can
                         load the SA2 files that intersect the current viewport.
+  districts.json        VEC 2022 state district boundaries as merged lines (shared borders stored
+                        once, simplified ~50 m) plus a label point per district.
+  groups.json           {"seats": {district: [sa1...]}, "suburbs": {suburb: [sa1...]}} for the
+                        bulk "print every SA1 in this seat / suburb" option. A straddling SA1
+                        is listed under each suburb that holds 20%+ of it.
 
 Suburb rule: overlay each SA1 on the locality polygons (in VicGrid metres so areas are
 honest) and keep every locality holding >= 20% of the SA1's area, largest first, joined
@@ -35,11 +40,13 @@ from shapely.strtree import STRtree
 SPATIAL = Path(r"C:\Users\Amit.Aalok\Australian Labor Party Victoria\Data - General\Amit\Spatial")
 SA1_SHP = SPATIAL / "sa1_districts.shp"
 LOC_SHP = SPATIAL / "Victoria Boundries" / "LOCALITY_POLYGON.shp"
+DIST_SHP = SPATIAL / "Victoria Boundries" / "STATE_ASSEMBLY_2022.shp"
 OUT = Path(__file__).resolve().parent.parent / "data"
 
 MIN_SHARE = 0.20   # a locality must cover this much of the SA1 to be named
 ROUND_DP = 6       # ~10 cm; keeps the JSON small without visible change at street scale
 SIMPLIFY_DEG = 0.00002  # ~2 m Douglas-Peucker; sub-pixel at print zooms, roughly halves the JSON
+DIST_SIMPLIFY_DEG = 0.0005  # ~50 m for the district lines; they are context, not the target
 
 
 def round_coords(obj):
@@ -60,6 +67,24 @@ def main():
     sa1_crs = pyproj.CRS.from_wkt(SA1_SHP.with_suffix(".prj").read_text())
     loc_crs = pyproj.CRS.from_wkt(LOC_SHP.with_suffix(".prj").read_text())
     to_vicgrid = pyproj.Transformer.from_crs(sa1_crs, loc_crs, always_xy=True).transform
+    to_latlon = pyproj.Transformer.from_crs(loc_crs, sa1_crs, always_xy=True).transform
+
+    # --- state districts (VicGrid -> lat/lon, simplified) -----------------------------
+    dist_polys, labels = [], []
+    for sr in shapefile.Reader(str(DIST_SHP)).iterShapeRecords(fields=["DISTRICT"]):
+        g = transform(to_latlon, shape(sr.shape.__geo_interface__))
+        dist_polys.append(g)
+        pt = g.representative_point()
+        labels.append({"name": sr.record["DISTRICT"].strip().title(),
+                       "lat": round(pt.y, 5), "lng": round(pt.x, 5)})
+    # coverage_simplify keeps shared borders identical between neighbours (no slivers);
+    # the union then stores each shared border once and line_merge joins the fragments
+    # into long lines (without it, simplify has nothing to remove and the file balloons).
+    simplified = shapely.coverage_simplify(dist_polys, DIST_SIMPLIFY_DEG)
+    lines = shapely.line_merge(shapely.unary_union([g.boundary for g in simplified]))
+    (OUT / "districts.json").write_text(json.dumps(
+        {"lines": round_coords(mapping(lines)), "labels": labels}, separators=(",", ":")), encoding="utf-8")
+    print(f"districts: {len(labels)}, {(OUT / 'districts.json').stat().st_size / 1e6:.1f} MB")
 
     # --- localities -----------------------------------------------------------------
     loc_reader = shapefile.Reader(str(LOC_SHP))
@@ -77,6 +102,8 @@ def main():
     sa1_reader = shapefile.Reader(str(SA1_SHP))
     by_sa2 = defaultdict(list)
     bbox_by_sa2 = {}
+    seats = defaultdict(list)      # district -> SA1 codes
+    suburbs = defaultdict(list)    # locality -> SA1 codes (an SA1 can sit under several)
     n = n_fallback = n_nogeom = 0
     fields = ["SA1_CODE21", "SA2_CODE21", "SA2_NAME21", "DISTRICT"]
     for sr in sa1_reader.iterShapeRecords(fields=fields):
@@ -109,9 +136,14 @@ def main():
         shares.sort(reverse=True)
         if shares:
             suburb = " / ".join(name for _, name in shares)
+            for _, name in shares:
+                suburbs[name].append(code)
         else:
             suburb = rec["SA2_NAME21"]
+            suburbs[suburb].append(code)
             n_fallback += 1
+        district = (rec["DISTRICT"] or "").strip().title()
+        seats[district].append(code)
 
         by_sa2[sa2].append({
             "type": "Feature",
@@ -119,7 +151,7 @@ def main():
                 "sa1": code,
                 "suburb": suburb,
                 "sa2": rec["SA2_NAME21"],
-                "district": (rec["DISTRICT"] or "").strip().title(),
+                "district": district,
             },
             "geometry": round_coords(mapping(g_draw)),
         })
@@ -144,6 +176,11 @@ def main():
         largest = max(largest, size)
     index = {sa2: [round(v, ROUND_DP) for v in b] for sa2, b in bbox_by_sa2.items()}
     (OUT / "sa2_index.json").write_text(json.dumps(index, separators=(",", ":")), encoding="utf-8")
+    groups = {"seats": {k: sorted(v) for k, v in sorted(seats.items())},
+              "suburbs": {k: sorted(v) for k, v in sorted(suburbs.items())}}
+    (OUT / "groups.json").write_text(json.dumps(groups, separators=(",", ":")), encoding="utf-8")
+    print(f"groups: {len(groups['seats'])} seats, {len(groups['suburbs'])} suburbs, "
+          f"{(OUT / 'groups.json').stat().st_size / 1e6:.1f} MB")
 
     print(f"SA1s written: {n} | skipped (no geometry): {n_nogeom} | SA2 files: {len(by_sa2)} "
           f"| suburb fallback to SA2 name: {n_fallback}")

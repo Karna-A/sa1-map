@@ -10,15 +10,23 @@
 </head>
 <body>
   <div id="toolbar">
-    <label for="codes">SA1 codes</label>
-    <textarea id="codes" rows="2" placeholder="Paste SA1 codes here (commas, spaces or new lines), then press Enter"></textarea>
-    <div id="buttons">
+    <div class="row">
+      <label for="codes">SA1 codes</label>
+      <textarea id="codes" rows="2" placeholder="Paste SA1 codes here (commas, spaces or new lines), then press Enter"></textarea>
       <button id="apply" type="button">Show</button>
-      <button id="addpin" type="button">Add pin</button>
       <button id="print" type="button">Print</button>
     </div>
+    <div class="row">
+      <label for="seat">Whole seat</label>
+      <select id="seat"><option value="">Choose a seat…</option></select>
+      <label for="suburb">Whole suburb</label>
+      <input id="suburb" list="suburbs" placeholder="Type a suburb…">
+      <datalist id="suburbs"></datalist>
+      <label for="login">Login details</label>
+      <input id="login" placeholder="e.g. SwiftFox user jsmith, PIN 1234 (printed on every page)">
+    </div>
     <div id="status"></div>
-    <div id="help">Click an SA1 on the map to add or remove it. Zoom in to see the surrounding SA1s. Click a pin to remove it, drag to move it.</div>
+    <div id="help">Click an SA1 on the map to add or remove it. Zoom in to see the surrounding SA1s. Blue dashed lines are state district boundaries. Print gives one A4 page per SA1.</div>
   </div>
 
   <div id="page">
@@ -29,6 +37,8 @@
     </div>
     <div id="map"></div>
   </div>
+
+  <div id="print-pages"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>

@@ -13,9 +13,14 @@ Open `index.html` (hosted, or via a local server) with the SA1 codes in the URL:
 
 - Paste codes into the box (commas, spaces or new lines all work) and press Enter or **Show**.
 - Click any SA1 on the map to add or remove it. Zoom in to see the surrounding SA1s and their codes.
-- **Add pin**, then click the map, to drop a labelled pin. Drag to move; click it to remove.
-- **Print** lays the page out as A4 landscape with the SA1 code(s), suburb and district at the top.
-- The URL always reflects the current selection and pins, so copy it to share the exact map.
+  Blue dashed lines are the state district boundaries.
+- **Whole seat** / **Whole suburb** select every SA1 in that seat or suburb (a suburb includes any
+  SA1 of which it covers 20% or more).
+- **Login details** is free text (e.g. the SwiftFox username and PIN) printed on every page so a
+  volunteer can be handed the sheet and log in.
+- **Print** produces one A4 landscape page per selected SA1: the code in large type, suburb,
+  district, date, login line and a map of that SA1 with its neighbours.
+- The URL always reflects the selection and login text, so copy it to reproduce the exact print.
 
 ## Data
 
@@ -31,7 +36,9 @@ Rebuild after either file changes:
 python build/build_sa1_data.py
 ```
 
-Outputs `data/sa2/<SA2 code>.json` (one file per SA2, simplified to about 2 m) and `data/sa2_index.json`.
+Outputs `data/sa2/<SA2 code>.json` (one file per SA2, simplified to about 2 m), `data/sa2_index.json`,
+`data/districts.json` (district boundary lines from `STATE_ASSEMBLY_2022.shp`, about 50 m) and
+`data/groups.json` (seat and suburb to SA1 lists). Takes about five minutes.
 
 ## Local testing
 
