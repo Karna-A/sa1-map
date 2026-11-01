@@ -277,11 +277,13 @@
   // print request survives the print dialog opening.
   function logEvent(event, codes) {
     if (!LOG_URL) return;
+    // Codes are space-separated so Sheets cannot read the list as one number, and a
+    // name is stripped of a leading =+-@ so it can never be taken for a formula.
     var body = JSON.stringify({
       event: event,
-      name: el.name.value.trim(),
+      name: el.name.value.trim().replace(/^[=+\-@]+/, ''),
       sa1_count: codes.length,
-      sa1s: codes.join(','),
+      sa1s: codes.join(' '),
       seat: el.seat.value,
       suburb: el.suburb.value,
       page: location.origin + location.pathname

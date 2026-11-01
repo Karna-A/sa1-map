@@ -52,7 +52,7 @@ function append_(b) {
       String(b.event || '').slice(0, 20),
       String(b.name || '').slice(0, 80),
       Number(b.sa1_count) || 0,
-      String(b.sa1s || '').slice(0, 5000),   // comma-separated 11-digit codes; a whole seat fits
+      String(b.sa1s || '').slice(0, 5000),   // space-separated 11-digit codes; a whole seat fits
       String(b.seat || '').slice(0, 60),
       String(b.suburb || '').slice(0, 60),
       String(b.page || '').slice(0, 200)
