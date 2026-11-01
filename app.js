@@ -328,14 +328,15 @@
       L.geoJSON({ type: 'FeatureCollection', features: context }, {
         style: function (f) { return f.properties.sa1 === code ? STYLE_SELECTED : STYLE_NEIGHBOUR; },
         onEachFeature: function (f, layer) {
-          layer.bindTooltip(f.properties.sa1, {
-            permanent: true, direction: 'center', interactive: false,
-            className: 'sa1-label ' + (f.properties.sa1 === code ? 'selected' : 'neighbour')
-          });
+          // Only the page's own SA1 is labelled; neighbours are drawn as plain outlines.
+          if (f.properties.sa1 === code) {
+            layer.bindTooltip(code, { permanent: true, direction: 'center', interactive: false, className: 'sa1-label selected' });
+          }
         }
       }).addTo(m);
 
-      m.fitBounds(sa1Layers[code].getBounds(), { padding: [10, 10], maxZoom: 18 });
+      // Zoom as close as the tiles allow so small SA1s fill the page.
+      m.fitBounds(sa1Layers[code].getBounds(), { padding: [6, 6], maxZoom: TILE_OPTS.maxZoom });
       tl.once('load', tileLayerDone);
       printMaps.push(m);
     });

@@ -28,7 +28,7 @@ body { display: flex; flex-direction: row; background: #fff; color-scheme: light
 .sa1-label { background: none; border: none; box-shadow: none; font-family: Consolas, monospace; font-size: 11px; color: #555; padding: 0; text-align: center; }
 .sa1-label.selected { color: #c00; font-weight: bold; font-size: 12px; }
 .sa1-label.neighbour { display: none; }
-.show-neighbour-labels .sa1-label.neighbour, .print-page .sa1-label.neighbour { display: block; }
+.show-neighbour-labels .sa1-label.neighbour { display: block; }
 .district-label { background: none; border: none; box-shadow: none; font-size: 14px; font-weight: bold; color: #8c1515; text-transform: uppercase; letter-spacing: 1px; padding: 0; display: none; }
 .show-district-labels .district-label { display: block; }
 
