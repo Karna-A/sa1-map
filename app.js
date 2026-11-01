@@ -21,6 +21,8 @@
 
   var STYLE_SELECTED = { color: '#d00', weight: 3, opacity: 1, fillColor: '#d00', fillOpacity: 0.08 };
   var STYLE_NEIGHBOUR = { color: '#777', weight: 1, opacity: 0.8, fillColor: '#000', fillOpacity: 0 };
+  // Print pages use a thinner line and lighter fill so street names underneath stay readable.
+  var STYLE_PRINT_TARGET = { color: '#d00', weight: 1.5, opacity: 1, fillColor: '#d00', fillOpacity: 0.05 };
   var STYLE_DISTRICT = { color: '#8c1515', weight: 3, opacity: 0.9, dashArray: '10 8', fill: false, interactive: false };
   var TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
   var TILE_OPTS = { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' };
@@ -326,13 +328,8 @@
         if (sa2Data[sa2]) context = context.concat(sa2Data[sa2].features);
       });
       L.geoJSON({ type: 'FeatureCollection', features: context }, {
-        style: function (f) { return f.properties.sa1 === code ? STYLE_SELECTED : STYLE_NEIGHBOUR; },
-        onEachFeature: function (f, layer) {
-          // Only the page's own SA1 is labelled; neighbours are drawn as plain outlines.
-          if (f.properties.sa1 === code) {
-            layer.bindTooltip(code, { permanent: true, direction: 'center', interactive: false, className: 'sa1-label selected' });
-          }
-        }
+        // No code labels on the printed map: the code is in the page heading.
+        style: function (f) { return f.properties.sa1 === code ? STYLE_PRINT_TARGET : STYLE_NEIGHBOUR; }
       }).addTo(m);
 
       // Zoom as close as the tiles allow so small SA1s fill the page.
