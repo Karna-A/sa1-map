@@ -25,7 +25,7 @@
   var STYLE_PRINT_TARGET = { color: '#d00', weight: 1.5, opacity: 1, fillColor: '#d00', fillOpacity: 0.05 };
   var STYLE_DISTRICT = { color: '#8c1515', weight: 3, opacity: 0.9, dashArray: '10 8', fill: false, interactive: false };
   // Usage log: Apps Script web app URL from analytics/Code.gs (empty string = no logging).
-  var LOG_URL = '';
+  var LOG_URL = 'https://script.google.com/macros/s/AKfycbz1lrOzKu3U7e6S14RNQgQ7AXL896eR0vdWr4IsNiZJygKDWTGm-TF5rzvXKh-sABj6kg/exec';
   var TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
   var TILE_OPTS = { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' };
 
