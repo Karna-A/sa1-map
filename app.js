@@ -2,8 +2,8 @@
  * SA1 print map.
  *
  * State lives in the URL so a map can be shared or bookmarked:
- *   ?sa1=21203130422:1234,21203130423&login=jsmith
- * (each code may carry its own PIN after a colon; login is printed on every page).
+ *   ?sa1=21203130422:1234,21203130423
+ * (each code may carry its own SwiftFox PIN after a colon; it is printed on that SA1's page).
  *
  * Data is pre-split per SA2 (data/sa2/<9 digits>.json); an SA1 code's first 9 digits
  * are its SA2 code, so the file for any code is known without an index. The SA2
@@ -30,7 +30,6 @@
 
   var selected = [];              // SA1 codes in the order they were entered
   var pins = {};                  // code -> PIN text for that SA1
-  var login = '';                 // free text printed on every page (e.g. SwiftFox username)
   var sa1Layers = {};             // code -> Leaflet polygon layer (once its SA2 file is loaded)
   var sa2Data = {};               // SA2 code -> raw GeoJSON (re-drawn on the print pages)
   var sa2Loads = {};              // SA2 code -> Promise (dedupes fetches)
@@ -40,7 +39,7 @@
   var printMaps = [];             // Leaflet maps created for the current print run
 
   var el = {};
-  ['codes', 'apply', 'print', 'clear', 'seat', 'suburb', 'suburb-scope', 'login', 'status', 'count', 'selected-list', 'print-pages']
+  ['codes', 'apply', 'print', 'clear', 'seat', 'suburb', 'suburb-scope', 'status', 'count', 'selected-list', 'print-pages']
     .forEach(function (id) { el[id.replace(/-(\w)/g, function (_, c) { return c.toUpperCase(); })] = document.getElementById(id); });
 
   // ---------------------------------------------------------------- data loading
@@ -188,7 +187,6 @@
     // Built by hand rather than URLSearchParams so the commas stay readable in the address bar.
     var parts = [];
     if (selected.length) parts.push('sa1=' + selected.map(token).join(','));
-    if (login) parts.push('login=' + encodeURIComponent(login));
     history.replaceState(null, '', parts.length ? '?' + parts.join('&') : location.pathname);
 
     if (document.activeElement !== el.codes) el.codes.value = selected.join('\n');
@@ -224,10 +222,7 @@
   }
 
   function readUrl() {
-    var params = new URLSearchParams(location.search);
-    login = params.get('login') || '';
-    el.login.value = login;
-    return parseCodes(params.get('sa1') || '');
+    return parseCodes(new URLSearchParams(location.search).get('sa1') || '');
   }
 
   // ---------------------------------------------------------------- bulk pick (seat / suburb)
@@ -273,11 +268,15 @@
   }
 
   // ---------------------------------------------------------------- print: one page per SA1
-  function loginLine(code) {
-    var bits = [];
-    if (login) bits.push(login);
-    if (pins[code]) bits.push('PIN ' + pins[code]);
-    return bits.length ? 'Login: ' + bits.join('  ·  ') : '';
+  // "PIN 1234   Please login at alp.sfox.au" (the reminder prints even without a PIN).
+  function fillPinLine(node, code) {
+    if (pins[code]) {
+      var pin = document.createElement('span');
+      pin.className = 'pp-pin';
+      pin.textContent = 'PIN ' + pins[code];
+      node.appendChild(pin);
+    }
+    node.appendChild(document.createTextNode('Please login at alp.sfox.au'));
   }
 
   function doPrint() {
@@ -310,7 +309,7 @@
       page.querySelector('.pp-code').textContent = code;
       page.querySelector('.pp-place').textContent = props.suburb + '  ·  ' + props.district + ' District';
       page.querySelector('.pp-date').textContent = today();
-      page.querySelector('.pp-login').textContent = loginLine(code);
+      fillPinLine(page.querySelector('.pp-login'), code);
       el.printPages.appendChild(page);
 
       var m = L.map(page.querySelector('.pp-map'), {
@@ -364,7 +363,6 @@
     if (el.seat.value) setSelected(groups.seats[el.seat.value].slice(), true);
   });
   el.suburb.addEventListener('change', function () { if (el.suburb.value) pickSuburb(el.suburb.value); });
-  el.login.addEventListener('input', function () { login = el.login.value.trim(); syncUi(); });
   el.print.addEventListener('click', doPrint);
   map.on('moveend zoomend', loadViewport);
   map.on('tooltipopen', function (e) {

@@ -47,7 +47,8 @@ body.printing #print-pages { display: block; }
 .pp-code { font: bold 46pt Consolas, "Courier New", monospace; line-height: 1.1; }
 .pp-sub { font-size: 14pt; margin: 1.5mm 0; }
 .pp-sub .pp-date { color: #555; float: right; }
-.pp-login { font-size: 14pt; font-weight: bold; margin-bottom: 1.5mm; }
+.pp-login { font-size: 14pt; margin-bottom: 1.5mm; }
+.pp-login .pp-pin { font-weight: bold; margin-right: 12mm; }
 .pp-map { flex: 1; min-height: 0; border: 1px solid #999; }
 .print-page .leaflet-control-attribution { font-size: 8px; }
 

@@ -8,10 +8,10 @@ Static site for printing doorknock maps of Victorian SA1s. Replaces the old
 Open `index.html` (hosted, or via a local server) with the SA1 codes in the URL:
 
 ```
-?sa1=21203130422:1234,21203130423&login=jsmith
+?sa1=21203130422:1234,21203130423
 ```
 
-(`code:pin` gives that SA1 its own PIN; `login` is printed on every page.)
+(`code:pin` gives that SA1 its own SwiftFox PIN, printed on its page.)
 
 - Paste codes into the box (commas, spaces or new lines all work) and press Enter or **Show**.
 - Click any SA1 on the map to add it; click a selected SA1 to set its PIN. The selected list on
@@ -20,11 +20,10 @@ Open `index.html` (hosted, or via a local server) with the SA1 codes in the URL:
 - **Whole seat** selects every SA1 in a seat. **Suburb** then narrows to that seat's suburbs and
   selects only the SA1s in both (with no seat chosen it selects the whole suburb). A suburb
   includes any SA1 of which it covers 20% or more.
-- **Login details** is free text (e.g. the SwiftFox username) printed on every page; each SA1's
-  PIN is printed on its own page after it.
+- Each SA1's PIN is printed on its page as "PIN 1234   Please login at alp.sfox.au".
 - **Print** produces one A4 landscape page per selected SA1: the code in large type, suburb,
-  district, date, login line and a map of that SA1 with its neighbours.
-- The URL always reflects the selection, PINs and login text, so copy it to reproduce the print.
+  district, date, PIN line and a map of that SA1 with its neighbours.
+- The URL always reflects the selection and PINs, so copy it to reproduce the print.
 
 ## Data
 
