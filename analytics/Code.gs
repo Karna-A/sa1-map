@@ -41,7 +41,13 @@ function append_(b) {
       sheet.appendRow(HEADERS);
       sheet.setFrozenRows(1);
     }
-    sheet.appendRow([
+    // Format the row as text BEFORE writing it. appendRow would parse the values like
+    // typing: "21203130422,21203130423" becomes a huge number and a name starting
+    // with "=" becomes a formula.
+    var row = sheet.getLastRow() + 1;
+    var range = sheet.getRange(row, 1, 1, HEADERS.length);
+    range.setNumberFormats([['yyyy-mm-dd hh:mm:ss', '@', '@', '0', '@', '@', '@', '@']]);
+    range.setValues([[
       new Date(),
       String(b.event || '').slice(0, 20),
       String(b.name || '').slice(0, 80),
@@ -50,7 +56,7 @@ function append_(b) {
       String(b.seat || '').slice(0, 60),
       String(b.suburb || '').slice(0, 60),
       String(b.page || '').slice(0, 200)
-    ]);
+    ]]);
   } finally {
     lock.releaseLock();
   }
