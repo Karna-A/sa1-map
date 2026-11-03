@@ -30,9 +30,13 @@ fragment, after `#`, which browsers never send to any server; old `?sa1=` links 
 
 Everything comes from the Spatial folder (set `SA1_SPATIAL_DIR` to its location), nothing from the roll:
 
-- `sa1_districts.shp`: ABS SA1 2021 polygons for Victoria, tagged with the VEC 2022 state district.
+- `sa1_districts.shp`: ABS SA1 2021 polygons for Victoria. (Its DISTRICT column is not used: it
+  mis-tags SA1s along seat edges.)
 - `Victoria Boundries/LOCALITY_POLYGON.shp`: Vicmap localities, overlaid on each SA1 to give the suburb
   (every locality holding 20%+ of the SA1's area, largest first).
+- `Victoria Boundries/STATE_ASSEMBLY_2022.shp`: VEC districts, overlaid the same way. The largest share
+  is the district printed on the page; the **Whole seat** list includes every SA1 of which the seat
+  covers 20% or more, so a straddling SA1 appears under both seats.
 
 Rebuild after either file changes:
 

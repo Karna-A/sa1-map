@@ -22,7 +22,10 @@ Outputs (into ../data):
 Suburb rule: overlay each SA1 on the locality polygons (in VicGrid metres so areas are
 honest) and keep every locality holding >= 20% of the SA1's area, largest first, joined
 with " / ". SA1s with no locality overlap (shouldn't happen on land) fall back to the ABS
-SA2 name. Run time is about a minute; re-run only when the shapefiles change.
+SA2 name. District uses the same overlay against STATE_ASSEMBLY_2022.shp (largest share
+is the printed district; each district with 20%+ gets the SA1 in its seat list) because
+the DISTRICT column on sa1_districts.shp mis-tags SA1s along seat edges. Run time is about
+five minutes; re-run only when the shapefiles change.
 """
 import json
 import os
@@ -76,12 +79,18 @@ def main():
 
     # --- state districts (VicGrid -> lat/lon, simplified) -----------------------------
     dist_polys, labels = [], []
+    dist_geoms_m, dist_names = [], []   # VicGrid copies for the SA1 overlay below
     for sr in shapefile.Reader(str(DIST_SHP)).iterShapeRecords(fields=["DISTRICT"]):
-        g = transform(to_latlon, shape(sr.shape.__geo_interface__))
+        gm = shape(sr.shape.__geo_interface__)
+        if not gm.is_valid:
+            gm = shapely.make_valid(gm)
+        dist_geoms_m.append(gm)
+        dist_names.append(sr.record["DISTRICT"].strip().title())
+        g = transform(to_latlon, gm)
         dist_polys.append(g)
         pt = g.representative_point()
-        labels.append({"name": sr.record["DISTRICT"].strip().title(),
-                       "lat": round(pt.y, 5), "lng": round(pt.x, 5)})
+        labels.append({"name": dist_names[-1], "lat": round(pt.y, 5), "lng": round(pt.x, 5)})
+    dist_tree = STRtree(dist_geoms_m)
     # coverage_simplify keeps shared borders identical between neighbours (no slivers);
     # the union then stores each shared border once and line_merge joins the fragments
     # into long lines (without it, simplify has nothing to remove and the file balloons).
@@ -109,7 +118,7 @@ def main():
     bbox_by_sa2 = {}
     seats = defaultdict(list)      # district -> SA1 codes
     suburbs = defaultdict(list)    # locality -> SA1 codes (an SA1 can sit under several)
-    n = n_fallback = n_nogeom = 0
+    n = n_fallback = n_nogeom = n_retagged = 0
     fields = ["SA1_CODE21", "SA2_CODE21", "SA2_NAME21", "DISTRICT"]
     for sr in sa1_reader.iterShapeRecords(fields=fields):
         rec = sr.record
@@ -147,8 +156,27 @@ def main():
             suburb = rec["SA2_NAME21"]
             suburbs[suburb].append(code)
             n_fallback += 1
-        district = (rec["DISTRICT"] or "").strip().title()
-        seats[district].append(code)
+        # District by overlay too. The DISTRICT column on sa1_districts.shp is not reliable
+        # (Nov 2026: 30 SA1s sitting 97-100% inside Tarneit were tagged Laverton / Werribee /
+        # Kororoit / Melton, so "whole seat" missed the edges). The largest share names the
+        # district printed on the page; every district with 20%+ lists the SA1 in its seat.
+        dshares = []
+        if area > 0:
+            for i in dist_tree.query(gm, predicate="intersects"):
+                a = gm.intersection(dist_geoms_m[i]).area / area
+                if a >= MIN_SHARE:
+                    dshares.append((a, dist_names[i]))
+        dshares.sort(reverse=True)
+        tagged = (rec["DISTRICT"] or "").strip().title()
+        if dshares:
+            district = dshares[0][1]
+            for _, name in dshares:
+                seats[name].append(code)
+        else:
+            district = tagged
+            seats[district].append(code)
+        if district != tagged:
+            n_retagged += 1
 
         by_sa2[sa2].append({
             "type": "Feature",
@@ -188,7 +216,7 @@ def main():
           f"{(OUT / 'groups.json').stat().st_size / 1e6:.1f} MB")
 
     print(f"SA1s written: {n} | skipped (no geometry): {n_nogeom} | SA2 files: {len(by_sa2)} "
-          f"| suburb fallback to SA2 name: {n_fallback}")
+          f"| suburb fallback to SA2 name: {n_fallback} | district differs from shapefile tag: {n_retagged}")
     print(f"data size: {total / 1e6:.1f} MB total, largest SA2 file {largest / 1e3:.0f} KB")
     print(f"done in {time.time() - t0:.0f}s")
 
