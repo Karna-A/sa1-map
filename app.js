@@ -19,6 +19,8 @@
   var DATA = 'data/';
   var NEIGHBOUR_ZOOM = 13;       // load and draw surrounding SA1s from this zoom
   var LABEL_ZOOM = 15;           // show neighbour code labels from this zoom
+  var SELECTED_LABEL_ZOOM = 14;  // selected codes hide below this zoom once the selection is large
+  var SELECTED_LABEL_MAX = 10;   // ... a selection this size or smaller stays labelled at any zoom
   var DISTRICT_LABEL_ZOOM = 11;  // show district names from this zoom
 
   var STYLE_SELECTED = { color: '#d00', weight: 3, opacity: 1, fillColor: '#d00', fillOpacity: 0.08 };
@@ -114,6 +116,10 @@
   function loadViewport() {
     var z = map.getZoom();
     map.getContainer().classList.toggle('show-neighbour-labels', z >= LABEL_ZOOM);
+    // A whole seat zoomed out is a solid block of red codes, so large selections are
+    // labelled only when zoomed in; a handful of SA1s keeps its labels at any zoom.
+    map.getContainer().classList.toggle('show-selected-labels',
+      z >= SELECTED_LABEL_ZOOM || selected.length <= SELECTED_LABEL_MAX);
     map.getContainer().classList.toggle('show-district-labels', z >= DISTRICT_LABEL_ZOOM);
     if (z < NEIGHBOUR_ZOOM || !sa2Index) return;
     sa2sInBounds(map.getBounds()).forEach(loadSa2);
@@ -201,6 +207,7 @@
     history.replaceState(null, '', location.pathname + state);
 
     if (document.activeElement !== el.codes) el.codes.value = selected.join('\n');
+    loadViewport();   // the selection size decides whether selected labels show
     el.count.textContent = selected.length ? '(' + selected.length + ')' : '';
 
     el.selectedList.innerHTML = '';
